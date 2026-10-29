@@ -30,32 +30,18 @@ type RuntimeConfigFilterOptions struct {
 	PostKillTimeout time.Duration
 }
 
-// RuntimeConfigFilter calls a series of hooks.  But instead of
-// passing container state on their standard input,
-// RuntimeConfigFilter passes the proposed runtime configuration (and
-// reads back a possibly-altered form from their standard output).
-//
-// Deprecated: Too many arguments, has been refactored and replaced by RuntimeConfigFilterWithOptions instead.
-func RuntimeConfigFilter(ctx context.Context, hooks []spec.Hook, config *spec.Spec, postKillTimeout time.Duration) (hookErr, err error) {
-	return RuntimeConfigFilterWithOptions(ctx, RuntimeConfigFilterOptions{
-		Hooks:           hooks,
-		Config:          config,
-		PostKillTimeout: postKillTimeout,
-	})
-}
-
 // RuntimeConfigFilterWithOptions calls a series of hooks.  But instead of
 // passing container state on their standard input,
 // RuntimeConfigFilterWithOptions passes the proposed runtime configuration (and
 // reads back a possibly-altered form from their standard output).
-func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFilterOptions) (hookErr, err error) {
+func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFilterOptions) (err error) {
 	data, err := json.Marshal(options.Config)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(options.Hooks) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	var stdoutFile, stderrFile *os.File
@@ -64,7 +50,7 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 		if stdoutPath, ok := options.Config.Annotations[annotationHookStdout]; ok {
 			f, openErr := os.OpenFile(stdoutPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o700)
 			if openErr != nil {
-				return nil, fmt.Errorf("opening stdout file for config-filter hook: %w", openErr)
+				return fmt.Errorf("opening stdout file for config-filter hook: %w", openErr)
 			}
 			stdoutFile = f
 			defer stdoutFile.Close()
@@ -73,7 +59,7 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 		if stderrPath, ok := options.Config.Annotations[annotationHookStderr]; ok {
 			f, openErr := os.OpenFile(stderrPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o700)
 			if openErr != nil {
-				return nil, fmt.Errorf("opening stderr file for config-filter hook: %w", openErr)
+				return fmt.Errorf("opening stderr file for config-filter hook: %w", openErr)
 			}
 			stderrFile = f
 			defer stderrFile.Close()
@@ -91,7 +77,7 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 			runStderr = stderrFile
 		}
 
-		hookErr, err = RunWithOptions(ctx, RunOptions{
+		err = RunWithOptions(ctx, RunOptions{
 			Hook:            &hook,
 			Dir:             options.Dir,
 			State:           data,
@@ -100,7 +86,7 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 			PostKillTimeout: options.PostKillTimeout,
 		})
 		if err != nil {
-			return hookErr, err
+			return err
 		}
 
 		newData := stdout.Bytes()
@@ -108,7 +94,7 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 		err = json.Unmarshal(newData, &newConfig)
 		if err != nil {
 			logrus.Debugf("invalid JSON from config-filter hook %d:\n%s", i, string(newData))
-			return nil, fmt.Errorf("unmarshal output from config-filter hook %d: %w", i, err)
+			return fmt.Errorf("unmarshal output from config-filter hook %d: %w", i, err)
 		}
 
 		if !reflect.DeepEqual(options.Config, &newConfig) {
@@ -119,5 +105,5 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 		data = newData
 	}
 
-	return nil, nil
+	return nil
 }

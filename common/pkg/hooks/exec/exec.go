@@ -31,26 +31,9 @@ type RunOptions struct {
 	PostKillTimeout time.Duration
 }
 
-// Run executes the hook and waits for it to complete or for the
-// context or hook-specified timeout to expire.
-//
-// Deprecated: Too many arguments, has been refactored and replaced by RunWithOptions instead.
-func Run(ctx context.Context, hook *rspec.Hook, state []byte, stdout io.Writer, stderr io.Writer, postKillTimeout time.Duration) (hookErr, err error) {
-	return RunWithOptions(
-		ctx,
-		RunOptions{
-			Hook:            hook,
-			State:           state,
-			Stdout:          stdout,
-			Stderr:          stderr,
-			PostKillTimeout: postKillTimeout,
-		},
-	)
-}
-
 // RunWithOptions executes the hook and waits for it to complete or for the
 // context or hook-specified timeout to expire.
-func RunWithOptions(ctx context.Context, options RunOptions) (hookErr, err error) {
+func RunWithOptions(ctx context.Context, options RunOptions) error {
 	hook := options.Hook
 	cmd := osexec.Cmd{
 		Path:   hook.Path,
@@ -71,9 +54,9 @@ func RunWithOptions(ctx context.Context, options RunOptions) (hookErr, err error
 		defer cancel()
 	}
 
-	err = cmd.Start()
+	err := cmd.Start()
 	if err != nil {
-		return err, err
+		return err
 	}
 	exit := make(chan error, 1)
 	go func() {
@@ -86,7 +69,7 @@ func RunWithOptions(ctx context.Context, options RunOptions) (hookErr, err error
 
 	select {
 	case err = <-exit:
-		return err, err
+		return err
 	case <-ctx.Done():
 		if err := cmd.Process.Kill(); err != nil {
 			logrus.Errorf("Failed to kill pid %v", cmd.Process)
@@ -98,6 +81,10 @@ func RunWithOptions(ctx context.Context, options RunOptions) (hookErr, err error
 			err = fmt.Errorf("failed to reap process within %s of the kill signal", options.PostKillTimeout)
 		case err = <-exit:
 		}
-		return err, ctx.Err()
+		if err != nil {
+			return fmt.Errorf("%w, %w", err, ctx.Err())
+		}
+		// Process must have completed successfully before the kill signal was delivered, we consider that success.
+		return nil
 	}
 }
