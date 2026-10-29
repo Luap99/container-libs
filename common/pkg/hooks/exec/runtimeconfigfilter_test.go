@@ -234,6 +234,28 @@ func TestRuntimeConfigFilter(t *testing.T) {
 			},
 			expectedErrorString: unexpectedEndOfJSONInput.Error(),
 		},
+		{
+			name: "stdout/err message logged in error",
+			hooks: []spec.Hook{
+				{
+					Path: path,
+					Args: []string{"sh", "-c", "echo outmsg; echo errmsg >&2; exit 1"},
+				},
+			},
+			input: &spec.Spec{
+				Version: "1.0.0",
+				Root: &spec.Root{
+					Path: "rootfs",
+				},
+			},
+			expected: &spec.Spec{
+				Version: "1.0.0",
+				Root: &spec.Root{
+					Path: "rootfs",
+				},
+			},
+			expectedErrorString: "executing [sh -c echo outmsg; echo errmsg >&2; exit 1]: exit status 1, hook stdout: outmsg\n, stderr: errmsg\n",
+		},
 	} {
 		test := tt
 		t.Run(test.name, func(t *testing.T) {

@@ -72,9 +72,10 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 			runStdout = io.MultiWriter(&stdout, stdoutFile)
 		}
 
-		var runStderr io.Writer
+		var stderr bytes.Buffer
+		var runStderr io.Writer = &stderr
 		if stderrFile != nil {
-			runStderr = stderrFile
+			runStderr = io.MultiWriter(&stderr, stderrFile)
 		}
 
 		err = RunWithOptions(ctx, RunOptions{
@@ -85,11 +86,15 @@ func RuntimeConfigFilterWithOptions(ctx context.Context, options RuntimeConfigFi
 			Stderr:          runStderr,
 			PostKillTimeout: options.PostKillTimeout,
 		})
+		newData := stdout.Bytes()
 		if err != nil {
+			stderr := stderr.String()
+			if len(newData) > 0 || stderr != "" {
+				return fmt.Errorf("%w, hook stdout: %s, stderr: %s", err, string(newData), stderr)
+			}
 			return err
 		}
 
-		newData := stdout.Bytes()
 		var newConfig spec.Spec
 		err = json.Unmarshal(newData, &newConfig)
 		if err != nil {
