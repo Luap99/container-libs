@@ -24,7 +24,7 @@ var path string
 var unavoidableEnvironmentKeys []string
 
 func TestRun(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := &rspec.Hook{
 		Path: path,
 		Args: []string{"sh", "-c", "cat"},
@@ -39,7 +39,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestRunIgnoreOutput(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := &rspec.Hook{
 		Path: path,
 		Args: []string{"sh", "-c", "cat"},
@@ -51,7 +51,7 @@ func TestRunIgnoreOutput(t *testing.T) {
 }
 
 func TestRunFailedStart(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := &rspec.Hook{
 		Path: "/does/not/exist",
 	}
@@ -81,7 +81,7 @@ func parseEnvironment(input string) (env map[string]string, err error) {
 }
 
 func TestRunEnvironment(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := &rspec.Hook{
 		Path: path,
 		Args: []string{"sh", "-c", "env"},
@@ -130,7 +130,7 @@ func TestRunEnvironment(t *testing.T) {
 }
 
 func TestRunCwd(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := &rspec.Hook{
 		Path: path,
 		Args: []string{"sh", "-c", "pwd"},
@@ -179,7 +179,7 @@ func TestRunCancel(t *testing.T) {
 	} {
 		test := tt
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			var stderr, stdout bytes.Buffer
 			if test.contextTimeout > 0 {
 				var cancel context.CancelFunc
@@ -205,7 +205,7 @@ func TestRunCancel(t *testing.T) {
 }
 
 func TestRunKillTimeout(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(500)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(500)*time.Millisecond)
 	defer cancel()
 	hook := &rspec.Hook{
 		Path: path,
