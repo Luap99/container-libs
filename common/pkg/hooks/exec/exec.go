@@ -74,10 +74,8 @@ func RunWithOptions(ctx context.Context, options RunOptions) error {
 		if err := cmd.Process.Kill(); err != nil {
 			logrus.Errorf("Failed to kill pid %v", cmd.Process)
 		}
-		timer := time.NewTimer(options.PostKillTimeout)
-		defer timer.Stop()
 		select {
-		case <-timer.C:
+		case <-time.After(options.PostKillTimeout):
 			err = fmt.Errorf("failed to reap process within %s of the kill signal", options.PostKillTimeout)
 		case err = <-exit:
 		}
